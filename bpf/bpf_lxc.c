@@ -497,7 +497,7 @@ int tail_handle_ipv6(struct __ctx_buff *ctx)
 	struct ipv6hdr *ip6;
 	int ret;
 
-	if (!revalidate_data(ctx, &data, &data_end, &ip6))
+	if (!revalidate_data_pull(ctx, &data, &data_end, &ip6))
 		return DROP_INVALID;
 
 	/* Handle special ICMPv6 messages. This includes echo requests to the
@@ -890,25 +890,22 @@ skip_egress_gateway:
 
 #ifdef ENABLE_VTEP
 	{
-		int i;
-		mac_t vtep_mac = 0;
+		struct vtep_key vkey = {};
+		struct vtep_value *vtep;
 
-		for (i = 0; i < VTEP_NUMS; i++) {
-			if (tunnel_endpoint == VTEP_ENDPOINT[i]) {
-				vtep_mac = VTEP_MAC[i];
-				break;
-			}
-		}
+		vkey.vtep_ip = ip4->daddr & VTEP_MASK;
+		vtep = map_lookup_elem(&VTEP_MAP, &vkey);
+		if (!vtep)
+			goto skip_vtep;
 
-		if (vtep_mac && tunnel_endpoint) {
-			if (eth_store_daddr(ctx, (__u8 *)&vtep_mac, 0) < 0)
+		if (vtep->vtep_mac && vtep->tunnel_endpoint) {
+			if (eth_store_daddr(ctx, (__u8 *)&vtep->vtep_mac, 0) < 0)
 				return DROP_WRITE_ERROR;
-			return __encap_and_redirect_with_nodeid(ctx,
-								tunnel_endpoint,
-								WORLD_ID,
-								&trace);
+			return __encap_and_redirect_with_nodeid(ctx, vtep->tunnel_endpoint,
+								WORLD_ID, &trace);
 		}
 	}
+skip_vtep:
 #endif
 
 #ifdef TUNNEL_MODE
@@ -1028,7 +1025,7 @@ int tail_handle_ipv4(struct __ctx_buff *ctx)
 	struct iphdr *ip4;
 	int ret;
 
-	if (!revalidate_data(ctx, &data, &data_end, &ip4))
+	if (!revalidate_data_pull(ctx, &data, &data_end, &ip4))
 		return DROP_INVALID;
 
 /* If IPv4 fragmentation is disabled
@@ -1865,7 +1862,8 @@ int handle_policy_egress(struct __ctx_buff *ctx)
 
 	edt_set_aggregate(ctx, 0); /* do not count this traffic again */
 	send_trace_notify(ctx, TRACE_FROM_PROXY, SECLABEL, 0, 0,
-			  0 /*ifindex*/, 0, TRACE_PAYLOAD_LEN);
+			  0 /*ifindex*/,
+			  TRACE_REASON_UNKNOWN, TRACE_PAYLOAD_LEN);
 
 	switch (proto) {
 #ifdef ENABLE_IPV6

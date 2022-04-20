@@ -130,7 +130,7 @@ build-container: ## Builds components required for cilium-agent container.
 $(SUBDIRS): force ## Execute default make target(make all) for the provided subdirectory.
 	@ $(MAKE) $(SUBMAKEOPTS) -C $@ all
 
-PRIV_TEST_PKGS_EVAL := $(shell for pkg in $(TESTPKGS); do echo $$pkg; done | xargs grep --include='*.go' -ril '+build [^!]*privileged_tests' | xargs dirname | sort | uniq)
+PRIV_TEST_PKGS_EVAL := $(shell for pkg in $(TESTPKGS); do echo $$pkg; done | xargs grep --include='*.go' -ril 'go:build [^!]*privileged_tests' | xargs dirname | sort | uniq)
 PRIV_TEST_PKGS ?= $(PRIV_TEST_PKGS_EVAL)
 tests-privileged: GO_TAGS_FLAGS+=privileged_tests ## Run integration-tests for Cilium that requires elevated privileges.
 tests-privileged:
@@ -311,6 +311,8 @@ manifests: ## Generate K8s manifests e.g. CRD, RBAC etc.
 	mv ${TMPDIR}/cilium.io_ciliumendpointslices.yaml ./pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliumendpointslices.yaml
 	mv ${TMPDIR}/cilium.io_ciliumclusterwideenvoyconfigs.yaml ./pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliumclusterwideenvoyconfigs.yaml
 	mv ${TMPDIR}/cilium.io_ciliumenvoyconfigs.yaml ./pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliumenvoyconfigs.yaml
+	mv ${TMPDIR}/cilium.io_ciliumbgppeeringpolicies.yaml ./pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliumbgppeeringpolicies.yaml
+	mv ${TMPDIR}/cilium.io_ciliumbgploadbalancerippools.yaml ./pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliumbgploadbalancerippools.yaml
 	rm -rf $(TMPDIR)
 
 generate-api: api/v1/openapi.yaml ## Generate cilium-agent client, model and server code from openapi spec.
@@ -413,6 +415,7 @@ generate-k8s-api: ## Generate Cilium k8s API client, deepcopy and deepequal Go s
 	maps:signalmap\
 	maps:sockmap\
 	maps:tunnel\
+	maps:vtep\
 	node:types\
 	policy:api\
 	service:store")

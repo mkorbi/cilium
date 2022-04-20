@@ -225,6 +225,12 @@ bgp:
     # -- Enable announcement of node pod CIDR
     podCIDR: false
 
+# -- This feature set enables virtual BGP routers to be created via 
+# CiliumBGPPeeringPolicy CRDs.
+bgpControlPlane:
+  # -- Enables the BGP control plane. 
+  enabled: false
+
 bpf:
   # -- Configure the mount point for the BPF filesystem
   root: /sys/fs/bpf
@@ -429,9 +435,14 @@ enableK8sEventHandover: false
 # -- Enable CiliumEndpointSlice feature.
 enableCiliumEndpointSlice: false
 
-# -- Enable cilium ingress controller
-# This will automatically set enable-envoy-config as well.
-enableIngressController: false
+ingressController:
+  # -- Enable cilium ingress controller
+  # This will automatically set enable-envoy-config as well.
+  enabled: false
+
+  # -- Enforce https for host having matching TLS host in Ingress.
+  # Incoming traffic to http listener will return 308 http error code with respective location in header.
+  enforceHttps: true
 
 # -- Enables the fallback compatibility solution for when the xt_socket kernel
 # module is missing and it is needed for the datapath L7 redirection to work
@@ -530,6 +541,9 @@ eni:
   # when Cilium is deployed. If you only want to control subnets for ENIs attached by Cilium,
   # use the CNI configuration file settings (cni.customConf) instead.
   subnetTagsFilter: ""
+  # -- Filter via AWS EC2 Instance tags (k=v) which will dictate which AWS EC2 Instances
+  # are going to be used to create new ENIs
+  instanceTagsFilter: ""
 
 externalIPs:
   # -- Enable ExternalIPs service support.
@@ -911,7 +925,7 @@ hubble:
       image:
         override: ~
         repository: docker.io/envoyproxy/envoy
-        tag: v1.18.4@sha256:e5c2bb2870d0e59ce917a5100311813b4ede96ce4eb0c6bfa879e3fbe3e83935
+        tag: v1.20.2@sha256:eb7d88d5186648049f0a80062120bd45e7557bdff3f6a30e1fc92cbb50916868
         pullPolicy: Always
 
       # -- Additional hubble-ui proxy environment variables.
@@ -1101,7 +1115,7 @@ l2NeighDiscovery:
   # -- Enable L2 neighbor discovery in the agent
   enabled: true
   # -- Override the agent's default neighbor resolution refresh period.
-  arping-refresh-period: "30s"
+  refreshPeriod: "30s"
 
 # -- Enable Layer 7 network policy.
 l7Proxy: true
@@ -1149,6 +1163,8 @@ vtep:
   endpoint: ""
 # -- A space separated list of VTEP device CIDRs, for example "1.1.1.0/24 1.1.2.0/24"
   cidr: ""
+# -- VTEP CIDRs Mask that applies to all VTEP CIDRs, for example "255.255.255.0"
+  mask: ""
 # -- A space separated list of VTEP device MAC addresses (VTEP MAC), for example "x:x:x:x:x:x  y:y:y:y:y:y:y"
   mac: ""
 
@@ -1788,7 +1804,7 @@ clustermesh:
       image:
         override: ~
         repository: quay.io/coreos/etcd
-        tag: v3.4.13
+        tag: v3.5.2@sha256:70fe70b6cdaea99fa9e99d3a16483954eb084c3b32a2475abea4e709a793636c
         pullPolicy: Always
 
     service:

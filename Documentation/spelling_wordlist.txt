@@ -128,6 +128,7 @@ Terraform
 Tierney
 Tu
 Twilio
+Uptime
 VM
 VPC
 Vagrantcloud
@@ -194,6 +195,7 @@ behaviour
 benchmarking
 benefitting
 bgp
+bgpControlPlane
 binPath
 bindProtection
 blog
@@ -257,6 +259,7 @@ cnpStatusUpdates
 codebase
 committer
 committers
+compat
 compinit
 conf
 confFileMountPath
@@ -306,6 +309,7 @@ decapsulated
 decapsulation
 decrypt
 decrypted
+deepcopy
 deletetopic
 demux
 dereference
@@ -359,6 +363,7 @@ endpointRoutes
 endpointSelector
 endpointStatus
 endpointmanager
+enforceHttps
 eni
 eniTags
 etcd
@@ -470,9 +475,11 @@ identityChangeGracePeriod
 identityGCInterval
 identityHeartbeatTimeout
 ie
+ifindex
 imagePullSecrets
 incrementing
 indices
+ingressController
 ingressing
 init
 initContainer
@@ -483,6 +490,7 @@ inlining
 inodes
 installIptablesRules
 installNoConntrackIptablesRules
+instanceTagsFilter
 integrations
 internet
 intra
@@ -683,6 +691,7 @@ originatingTLS
 pahole
 parserfactory
 parsers
+passthrough
 pc
 pcap
 perf
@@ -726,6 +735,7 @@ prog
 programmability
 prometheus
 protobuf
+proxying
 proxylib
 pullPolicy
 qdisc
@@ -749,6 +759,7 @@ recompiles
 recv
 recvmsg
 refactoring
+refreshPeriod
 regenerations
 regex
 regexes

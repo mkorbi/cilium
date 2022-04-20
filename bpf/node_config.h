@@ -90,6 +90,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define IPCACHE_MAP test_cilium_ipcache
 #define ENCRYPT_MAP test_cilium_encrypt_state
 #define TUNNEL_MAP test_cilium_tunnel_map
+#define VTEP_MAP test_cilium_vtep_map
 #define EP_POLICY_MAP test_cilium_ep_to_policy
 #define LB6_REVERSE_NAT_MAP test_cilium_lb6_reverse_nat
 #define LB6_SERVICES_MAP_V2 test_cilium_lb6_services
@@ -111,10 +112,16 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #define THROTTLE_MAP_SIZE 65536
 #define ENABLE_ARP_RESPONDER
 #define TUNNEL_ENDPOINT_MAP_SIZE 65536
+#define VTEP_MAP_SIZE 8
 #define ENDPOINTS_MAP_SIZE 65536
 #define METRICS_MAP_SIZE 65536
 #define CILIUM_NET_MAC  { .addr = { 0xce, 0x72, 0xa7, 0x03, 0x88, 0x57 } }
-#define CILIUM_LB_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_REV_NAT_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_SERVICE_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_BACKENDS_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_AFFINITY_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_REV_NAT_MAP_MAX_ENTRIES	65536
+#define CILIUM_LB_MAGLEV_MAP_MAX_ENTRIES	65536
 #define POLICY_MAP_SIZE 16384
 #define IPCACHE_MAP_SIZE 512000
 #define EGRESS_POLICY_MAP_SIZE 16384
@@ -179,15 +186,7 @@ DEFINE_IPV6(HOST_IP, 0xbe, 0xef, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0xa, 0x
 #endif
 
 #ifdef ENABLE_VTEP
-#define VTEP_ENDPOINT (__u32[]){0xeb48a90a, 0xec48a90a}
-/* HEX representation of VTEP IP
- * 10.169.72.235, 10.169.72.236
- */
-#define VTEP_MAC (__u64[]){0x562e984c3682, 0x552e984c3682}
-/* VTEP MAC address
- * 82:36:4c:89:2e:56, 82:36:4c:89:2e:55
- */
-#define VTEP_NUMS 2
+# define VTEP_MASK 0xffffff
 #endif
 
 /* It appears that we can support around the below number of prefixes in an

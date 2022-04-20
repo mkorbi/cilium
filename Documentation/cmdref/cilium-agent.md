@@ -77,6 +77,7 @@ cilium-agent [flags]
       --enable-auto-protect-node-port-range                  Append NodePort range to net.ipv4.ip_local_reserved_ports if it overlaps with ephemeral port range (net.ipv4.ip_local_port_range) (default true)
       --enable-bandwidth-manager                             Enable BPF bandwidth manager
       --enable-bbr                                           Enable BBR for the bandwidth manager
+      --enable-bgp-control-plane                             Enable the BGP control plane.
       --enable-bpf-clock-probe                               Enable BPF clock source probing for more efficient tick retrieval
       --enable-bpf-masquerade                                Masquerade packets from endpoints leaving the host with BPF instead of iptables
       --enable-bpf-tproxy                                    Enable BPF-based proxy redirection, if support available
@@ -163,6 +164,7 @@ cilium-agent [flags]
       --hubble-tls-key-file string                           Path to the private key file for the Hubble server. The file must contain PEM encoded data.
       --identity-allocation-mode string                      Method to use for identity allocation (default "kvstore")
       --identity-change-grace-period duration                Time to wait before using new identity on endpoint identity change (default 5s)
+      --identity-restore-grace-period duration               Time to wait before releasing unused restored CIDR identities during agent restart (default 10m0s)
       --install-iptables-rules                               Install base iptables rules for cilium to mainly interact with kube-proxy (and masquerading) (default true)
       --install-no-conntrack-iptables-rules                  Install Iptables rules to skip netfilter connection tracking on all pod traffic. This option is only effective when Cilium is running in direct routing and full KPR mode. Moreover, this option cannot be enabled when Cilium is running in a managed Kubernetes environment or in a chained CNI setup.
       --ip-allocation-timeout duration                       Time after which an incomplete CIDR allocation is considered failed (default 2m0s)
@@ -225,6 +227,7 @@ cilium-agent [flags]
       --prepend-iptables-chains                              Prepend custom iptables chains instead of appending (default true)
       --prometheus-serve-addr string                         IP:Port on which to serve prometheus metrics (pass ":Port" to bind on all interfaces, "" is off)
       --proxy-connect-timeout uint                           Time after which a TCP connect attempt is considered failed unless completed (in seconds) (default 1)
+      --proxy-gid uint                                       Group ID for proxy control plane sockets. (default 1337)
       --proxy-max-connection-duration-seconds int            Set Envoy HTTP option max_connection_duration seconds. Default 0 (disable)
       --proxy-max-requests-per-connection int                Set Envoy HTTP option max_requests_per_connection. Default 0 (disable)
       --proxy-prometheus-port int                            Port to serve Envoy metrics on. Default 0 (disabled).
@@ -253,6 +256,7 @@ cilium-agent [flags]
       --vtep-cidr strings                                    List of VTEP CIDRs that will be routed towards VTEPs for traffic cluster egress
       --vtep-endpoint strings                                List of VTEP IP addresses
       --vtep-mac strings                                     List of VTEP MAC addresses for forwarding traffic outside the cluster
+      --vtep-mask string                                     VTEP CIDR Mask for all VTEP CIDRs (default "255.255.255.0")
       --write-cni-conf-when-ready string                     Write the CNI configuration as specified via --read-cni-conf to path when agent is ready
 ```
 

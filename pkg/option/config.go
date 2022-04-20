@@ -718,6 +718,10 @@ const (
 	// IdentityChangeGracePeriod option
 	IdentityChangeGracePeriod = "identity-change-grace-period"
 
+	// IdentityRestoreGracePeriod is the name of the
+	// IdentityRestoreGracePeriod option
+	IdentityRestoreGracePeriod = "identity-restore-grace-period"
+
 	// EnableHealthChecking is the name of the EnableHealthChecking option
 	EnableHealthChecking = "enable-health-checking"
 
@@ -968,6 +972,24 @@ const (
 	// LBMapEntriesName configures max entries for BPF lbmap.
 	LBMapEntriesName = "bpf-lb-map-max"
 
+	// LBServiceMapMaxEntries configures max entries of bpf map for services.
+	LBServiceMapMaxEntries = "bpf-lb-service-map-max"
+
+	// LBBackendMapMaxEntries configures max entries of bpf map for service backends.
+	LBBackendMapMaxEntries = "bpf-lb-service-backend-map-max"
+
+	// LBRevNatMapMaxEntries configures max entries of bpf map for reverse NAT.
+	LBRevNatMapMaxEntries = "bpf-lb-rev-nat-map-max"
+
+	// LBAffinityMapMaxEntries configures max entries of bpf map for session affinity.
+	LBAffinityMapMaxEntries = "bpf-lb-affinity-map-max"
+
+	// LBSourceRangeMapMaxEntries configures max entries of bpf map for service source ranges.
+	LBSourceRangeMapMaxEntries = "bpf-lb-source-range-map-max"
+
+	// LBMaglevMapMaxEntries configures max entries of bpf map for Maglev.
+	LBMaglevMapMaxEntries = "bpf-lb-maglev-map-max"
+
 	// K8sServiceProxyName instructs Cilium to handle service objects only when
 	// service.kubernetes.io/service-proxy-name label equals the provided value.
 	K8sServiceProxyName = "k8s-service-proxy-name"
@@ -1030,12 +1052,18 @@ const (
 	// VTEP CIDRs
 	VtepCIDR = "vtep-cidr"
 
+	// VTEP CIDR Mask applies to all VtepCIDR
+	VtepMask = "vtep-mask"
+
 	// VTEP MACs
 	VtepMAC = "vtep-mac"
 
 	// TCFilterPriority sets the priority of the cilium tc filter, enabling other
 	// filters to be inserted prior to the cilium filter.
 	TCFilterPriority = "bpf-filter-priority"
+
+	// Flag to enable BGP control plane features
+	EnableBGPControlPlane = "enable-bgp-control-plane"
 )
 
 // Default string arguments
@@ -1091,6 +1119,10 @@ const (
 	// ProxyConnectTimeout specifies the time in seconds after which a TCP connection attempt
 	// is considered timed out
 	ProxyConnectTimeout = "proxy-connect-timeout"
+
+	// ProxyGID specifies the group ID that has access to unix domain sockets opened by Cilium
+	// agent for proxy configuration and access logging.
+	ProxyGID = "proxy-gid"
 
 	// ReadCNIConfiguration reads the CNI configuration file and extracts
 	// Cilium relevant information. This can be used to pass per node
@@ -1438,6 +1470,10 @@ type DaemonConfig struct {
 	// connection attempt to have timed out.
 	ProxyConnectTimeout int
 
+	// ProxyGID specifies the group ID that has access to unix domain sockets opened by Cilium
+	// agent for proxy configuration and access logging.
+	ProxyGID int
+
 	// ProxyPrometheusPort specifies the port to serve Envoy metrics on.
 	ProxyPrometheusPort int
 
@@ -1671,6 +1707,13 @@ type DaemonConfig struct {
 	// already been allocated and other nodes in the cluster have a chance
 	// to whitelist the new upcoming identity of the endpoint.
 	IdentityChangeGracePeriod time.Duration
+
+	// IdentityRestoreGracePeriod is the grace period that needs to pass before CIDR identities
+	// restored during agent restart are released. If any of the restored identities remains
+	// unused after this time, they will be removed from the IP cache. Any of the restored
+	// identities that are used in network policies will remain in the IP cache until all such
+	// policies are removed.
+	IdentityRestoreGracePeriod time.Duration
 
 	// PolicyQueueSize is the size of the queues for the policy repository.
 	// A larger queue means that more events related to policy can be buffered.
@@ -2035,6 +2078,24 @@ type DaemonConfig struct {
 	// LBMapEntries is the maximum number of entries allowed in BPF lbmap.
 	LBMapEntries int
 
+	// LBServiceMapEntries is the maximum number of entries allowed in BPF lbmap for services.
+	LBServiceMapEntries int
+
+	// LBBackendMapEntries is the maximum number of entries allowed in BPF lbmap for service backends.
+	LBBackendMapEntries int
+
+	// LBRevNatEntries is the maximum number of entries allowed in BPF lbmap for reverse NAT.
+	LBRevNatEntries int
+
+	// LBAffinityMapEntries is the maximum number of entries allowed in BPF lbmap for session affinities.
+	LBAffinityMapEntries int
+
+	// LBSourceRangeMapEntries is the maximum number of entries allowed in BPF lbmap for source ranges.
+	LBSourceRangeMapEntries int
+
+	// LBMaglevMapEntries is the maximum number of entries allowed in BPF lbmap for maglev.
+	LBMaglevMapEntries int
+
 	// K8sServiceProxyName is the value of service.kubernetes.io/service-proxy-name label,
 	// that identifies the service objects Cilium should handle.
 	// If the provided value is an empty string, Cilium will manage service objects when
@@ -2111,12 +2172,18 @@ type DaemonConfig struct {
 	// VtepCIDRs VTEP CIDRs
 	VtepCIDRs []*cidr.CIDR
 
+	// VtepMask VTEP Mask
+	VtepCidrMask net.IP
+
 	// VtepMACs VTEP MACs
 	VtepMACs []mac.MAC
 
 	// TCFilterPriority sets the priority of the cilium tc filter, enabling other
 	// filters to be inserted prior to the cilium filter.
 	TCFilterPriority int
+
+	// Enables BGP control plane features.
+	EnableBGPControlPlane bool
 }
 
 var (
@@ -2142,6 +2209,7 @@ var (
 		KVstoreConnectivityTimeout:   defaults.KVstoreConnectivityTimeout,
 		IPAllocationTimeout:          defaults.IPAllocationTimeout,
 		IdentityChangeGracePeriod:    defaults.IdentityChangeGracePeriod,
+		IdentityRestoreGracePeriod:   defaults.IdentityRestoreGracePeriod,
 		FixedIdentityMapping:         make(map[string]string),
 		KVStoreOpt:                   make(map[string]string),
 		LogOpt:                       make(map[string]string),
@@ -2163,8 +2231,9 @@ var (
 		K8sEnableLeasesFallbackDiscovery: defaults.K8sEnableLeasesFallbackDiscovery,
 		APIRateLimit:                     make(map[string]string),
 
-		ExternalClusterIP: defaults.ExternalClusterIP,
-		EnableVTEP:        defaults.EnableVTEP,
+		ExternalClusterIP:     defaults.ExternalClusterIP,
+		EnableVTEP:            defaults.EnableVTEP,
+		EnableBGPControlPlane: defaults.EnableBGPControlPlane,
 	}
 )
 
@@ -2487,9 +2556,6 @@ func (c *DaemonConfig) Validate() error {
 	}
 
 	if c.EnableVTEP {
-		if c.EnablePolicy != NeverEnforce {
-			return fmt.Errorf("%s (beta) is currently only supported with %s=%s.", EnableVTEP, EnablePolicy, NeverEnforce)
-		}
 		err := c.validateVTEP()
 		if err != nil {
 			return fmt.Errorf("Failed to validate VTEP configuration: %w", err)
@@ -2670,6 +2736,7 @@ func (c *DaemonConfig) Populate() {
 	c.HTTPRetryCount = viper.GetInt(HTTPRetryCount)
 	c.HTTPRetryTimeout = viper.GetInt(HTTPRetryTimeout)
 	c.IdentityChangeGracePeriod = viper.GetDuration(IdentityChangeGracePeriod)
+	c.IdentityRestoreGracePeriod = viper.GetDuration(IdentityRestoreGracePeriod)
 	c.IPAM = viper.GetString(IPAM)
 	c.IPv4Range = viper.GetString(IPv4Range)
 	c.IPv4NodeAddr = viper.GetString(IPv4NodeAddr)
@@ -2732,6 +2799,7 @@ func (c *DaemonConfig) Populate() {
 	c.PrependIptablesChains = viper.GetBool(PrependIptablesChainsName)
 	c.PrometheusServeAddr = viper.GetString(PrometheusServeAddr)
 	c.ProxyConnectTimeout = viper.GetInt(ProxyConnectTimeout)
+	c.ProxyGID = viper.GetInt(ProxyGID)
 	c.ProxyPrometheusPort = viper.GetInt(ProxyPrometheusPort)
 	c.ProxyMaxRequestsPerConnection = viper.GetInt(ProxyMaxRequestsPerConnection)
 	c.ProxyMaxConnectionDuration = time.Duration(viper.GetInt64(ProxyMaxConnectionDuration))
@@ -3042,6 +3110,9 @@ func (c *DaemonConfig) Populate() {
 
 	// VTEP integration enable option
 	c.EnableVTEP = viper.GetBool(EnableVTEP)
+
+	// Enable BGP control plane features
+	c.EnableBGPControlPlane = viper.GetBool(EnableBGPControlPlane)
 }
 
 func (c *DaemonConfig) populateDevices() {
@@ -3211,6 +3282,21 @@ func (c *DaemonConfig) checkMapSizeLimits() error {
 		return fmt.Errorf("specified LBMap max entries %d must be a value greater than 0", c.LBMapEntries)
 	}
 
+	if c.LBServiceMapEntries < 0 ||
+		c.LBBackendMapEntries < 0 ||
+		c.LBRevNatEntries < 0 ||
+		c.LBAffinityMapEntries < 0 ||
+		c.LBSourceRangeMapEntries < 0 ||
+		c.LBMaglevMapEntries < 0 {
+		return fmt.Errorf("specified LB Service Map max entries must not be a negative value"+
+			"(Service Map: %d, Service Backend: %d, Reverse NAT: %d, Session Affinity: %d, Source Range: %d, Maglev: %d)",
+			c.LBServiceMapEntries,
+			c.LBBackendMapEntries,
+			c.LBRevNatEntries,
+			c.LBAffinityMapEntries,
+			c.LBSourceRangeMapEntries,
+			c.LBMaglevMapEntries)
+	}
 	return nil
 }
 
@@ -3251,6 +3337,12 @@ func (c *DaemonConfig) calculateBPFMapSizes() error {
 	c.PolicyMapEntries = viper.GetInt(PolicyMapEntriesName)
 	c.SockRevNatEntries = viper.GetInt(SockRevNatEntriesName)
 	c.LBMapEntries = viper.GetInt(LBMapEntriesName)
+	c.LBServiceMapEntries = viper.GetInt(LBServiceMapMaxEntries)
+	c.LBBackendMapEntries = viper.GetInt(LBBackendMapMaxEntries)
+	c.LBRevNatEntries = viper.GetInt(LBRevNatMapMaxEntries)
+	c.LBAffinityMapEntries = viper.GetInt(LBAffinityMapMaxEntries)
+	c.LBSourceRangeMapEntries = viper.GetInt(LBSourceRangeMapMaxEntries)
+	c.LBMaglevMapEntries = viper.GetInt(LBMaglevMapMaxEntries)
 
 	// Don't attempt dynamic sizing if any of the sizeof members was not
 	// populated by the daemon (or any other caller).
@@ -3388,6 +3480,7 @@ func (c *DaemonConfig) calculateDynamicBPFMapSizes(totalMemory uint64, dynamicSi
 func (c *DaemonConfig) validateVTEP() error {
 	vtepEndpoints := viper.GetStringSlice(VtepEndpoint)
 	vtepCIDRs := viper.GetStringSlice(VtepCIDR)
+	vtepCidrMask := viper.GetString(VtepMask)
 	vtepMACs := viper.GetStringSlice(VtepMAC)
 
 	if (len(vtepEndpoints) < 1) ||
@@ -3395,17 +3488,17 @@ func (c *DaemonConfig) validateVTEP() error {
 		len(vtepEndpoints) != len(vtepMACs) {
 		return fmt.Errorf("VTEP configuration must have the same number of Endpoint, VTEP and MAC configurations (Found %d endpoints, %d MACs, %d CIDR ranges)", len(vtepEndpoints), len(vtepMACs), len(vtepCIDRs))
 	}
-	//Todo: resolve github issue 18616 to lift the maximum 2 VTEP limit
-	if len(vtepEndpoints) > 2 {
-		return fmt.Errorf("VTEP must not exceed 2 VTEP devices (Found %d VTEPs)", len(vtepEndpoints))
+	if len(vtepEndpoints) > defaults.MaxVTEPDevices {
+		return fmt.Errorf("VTEP must not exceed %d VTEP devices (Found %d VTEPs)", defaults.MaxVTEPDevices, len(vtepEndpoints))
 	}
 	for _, ep := range vtepEndpoints {
-		if strings.Contains(ep, ":") {
-			return fmt.Errorf("VTEP integration IPv6 not supported: %v", ep)
-		}
 		endpoint := net.ParseIP(ep)
 		if endpoint == nil {
 			return fmt.Errorf("Invalid VTEP IP: %v", ep)
+		}
+		ip4 := endpoint.To4()
+		if ip4 == nil {
+			return fmt.Errorf("Invalid VTEP IPv4 address %v", ip4)
 		}
 		c.VtepEndpoints = append(c.VtepEndpoints, endpoint)
 
@@ -3418,6 +3511,11 @@ func (c *DaemonConfig) validateVTEP() error {
 		c.VtepCIDRs = append(c.VtepCIDRs, externalCIDR)
 
 	}
+	mask := net.ParseIP(vtepCidrMask)
+	if mask == nil {
+		return fmt.Errorf("Invalid VTEP CIDR Mask: %v", vtepCidrMask)
+	}
+	c.VtepCidrMask = mask
 	for _, m := range vtepMACs {
 		externalMAC, err := mac.ParseMAC(m)
 		if err != nil {
@@ -3464,6 +3562,10 @@ func (c *DaemonConfig) StoreInFile(dir string) error {
 	e := json.NewEncoder(f)
 	e.SetIndent("", " ")
 	return e.Encode(c)
+}
+
+func (c *DaemonConfig) BGPControlPlaneEnabled() bool {
+	return c.EnableBGPControlPlane
 }
 
 // StoreViperInFile stores viper's configuration in a the given directory under

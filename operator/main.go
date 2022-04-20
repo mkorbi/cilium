@@ -3,7 +3,7 @@
 
 // Ensure build fails on versions of Go that are not supported by Cilium.
 // This build tag should be kept in sync with the version specified in go.mod.
-//go:build go1.17
+//go:build go1.18
 
 package main
 
@@ -468,7 +468,7 @@ func onOperatorStartLeading(ctx context.Context) {
 					log := log.WithField(logfields.LogSubsys, "etcd")
 					goopts = &kvstore.ExtraOptions{
 						DialOption: []grpc.DialOption{
-							grpc.WithDialer(k8s.CreateCustomDialer(svcGetter, log)),
+							grpc.WithContextDialer(k8s.CreateCustomDialer(svcGetter, log)),
 						},
 					}
 				}
@@ -559,7 +559,7 @@ func onOperatorStartLeading(ctx context.Context) {
 	}
 
 	if operatorOption.Config.EnableIngressController {
-		ingressController, err := ingress.NewIngressController()
+		ingressController, err := ingress.NewIngressController(ingress.WithHTTPSEnforced(operatorOption.Config.EnforceIngressHTTPS))
 		if err != nil {
 			log.WithError(err).WithField(logfields.LogSubsys, ingress.Subsys).Fatal(
 				"Failed to start ingress controller")

@@ -2,22 +2,23 @@ Who is using Cilium?
 ====================
 
 Sharing experiences and learning from other users is essential. We are
-frequently asked who is using a particular feature of Cilium to get in
-contact with other users to share experiences and best-practices. While the
-[Cilium Slack community](https://cilium.herokuapp.com/) allows users to
-get in touch, it can be challenging to find users of a particular feature
-quickly.
+frequently asked who is using a particular feature of Cilium so people can get in
+contact with other users to share experiences and best practices. People
+also often want to know if product/platform X has integrated Cilium. 
+While the [Cilium Slack community](https://cilium.herokuapp.com/) allows
+users to get in touch, it can be challenging to find this information quickly.
 
-The following is a directory of users to help identify users of individual
+The following is a directory of adopters to help identify users of individual
 features. The users themselves directly maintain the list.
 
 Adding yourself as a user
 -------------------------
 
-If you are using Cilium, please consider adding yourself as a user with a quick
+If you are using Cilium or it is integrated into your product, service, or 
+platform, please consider adding yourself as a user with a quick
 description of your use case by opening a pull request to this file and adding
 a section describing your usage of Cilium. If you are open to others contacting
-you about your use of Cilium on Slack, add your Slack nick as well.
+you about your use of Cilium on Slack, add your Slack nickname as well.
 
     N: Name of user (company or individual)
     D: Description
@@ -150,6 +151,12 @@ Users (Alphabetically)
       U: Networking, network policy, and network visibility
       L: https://cloud.google.com/blog/products/containers-kubernetes/bringing-ebpf-and-cilium-to-google-kubernetes-engine
 
+    * N: Infomaniak
+      D: Infomaniak is using Cilium in their production clusters (self-hosted, bare-metal and openstack)
+      U: Networking, CiliumNetworkPolicy, BPF NodePort, Direct routing, kube-proxy replacement
+      L: https://www.infomaniak.com/en
+      Q: @reneluria
+  
     * N: JUMO
       D: JUMO is using Cilium as their CNI plugin for all of their AWS-hosted EKS clusters
       U: Networking, network policy, network visibility, cluster mesh
@@ -182,6 +189,23 @@ Users (Alphabetically)
       D: Meltwater is using Cilim in AWS on self-hosted multi-tenant k8s clusters as the CNI plugin
       U: ENI Networking, Encryption, Monitoring via Prometheus metrics & Hubble
       Q: @recollir, @dezmodue
+      
+    * N: MyFitnessPal
+      D: MyFitnessPal trusts Cilium with high volume user traffic in AWS on self-hosted k8s clusters as the CNI plugin and in GKE with Dataplane V2
+      U: Networking (CNI, Maglev, kube-proxy replacement, local redirect policy),  Observability (Network metrics with Hubble, DNS proxy, service maps, policy troubleshooting) and Security (Network Policy)
+      L: https://www.myfitnesspal.com
+
+    * N: Mux, Inc.
+      D: Mux deploys Cilium on self-hosted k8s clusters (Cluster API) in GCP and AWS to run its video streaming/analytics platforms.
+      U: Pod networking (CNI, IPAM, Host-reachable Services), Hubble, Cluster-mesh. TBD: Network Policy, Transparent Encryption (WG), Host Firewall.
+      L: https://mux.com
+      Q: @dilyevsky
+
+    * N: New York Times (the)
+      D: The New York Times is using Cilium on EKS to build multi-region multi-tenant shared clusters
+      U: Networking (CNI, EKS IPAM, Maglev, kube-proxy replacement, Direct Routing),  Observability (Network metrics with Hubble, policy troubleshooting) and Security (Network Policy)
+      L: https://www.nytimes.com/
+      Q: @prune
 
     * N: Nexxiot
       D: Nexxiot is an IoT SaaS provider using Cilium as the main CNI plugin on AWS EKS clusters
@@ -230,6 +254,12 @@ Users (Alphabetically)
       U: CNI , Overlay Network, Network Policies
       L: https://www.concur.com, https://gardener.cloud/, https://github.com/gardener/gardener-extension-networking-cilium
       Q: @dragan (SAP Concur), @docktofuture & @ScheererJ (Gardener)
+
+    * N: Simple
+      D: Simple uses cilium as default CNI in Kubernetes clusters (AWS EKS) for both development and production environments.
+      U: CNI, Network Policies, Hubble
+      L: https://simple.life
+      Q: @sergeyshevch
 
     * N: Scaleway
       D: Scaleway uses Cilium as the default CNI for Kubernetes Kapsule

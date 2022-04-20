@@ -57,6 +57,14 @@
      - Enable BGP support inside Cilium; embeds a new ConfigMap for BGP inside cilium-agent and cilium-operator
      - bool
      - ``false``
+   * - bgpControlPlane
+     - This feature set enables virtual BGP routers to be created via  CiliumBGPPeeringPolicy CRDs.
+     - object
+     - ``{"enabled":false}``
+   * - bgpControlPlane.enabled
+     - Enables the BGP control plane.
+     - bool
+     - ``false``
    * - bpf.clockProbe
      - Enable BPF clock source probing for more efficient tick retrieval.
      - bool
@@ -144,7 +152,7 @@
    * - clustermesh.apiserver.etcd.image
      - Clustermesh API server etcd image.
      - object
-     - ``{"override":null,"pullPolicy":"Always","repository":"quay.io/coreos/etcd","tag":"v3.4.13"}``
+     - ``{"override":null,"pullPolicy":"Always","repository":"quay.io/coreos/etcd","tag":"v3.5.2@sha256:70fe70b6cdaea99fa9e99d3a16483954eb084c3b32a2475abea4e709a793636c"}``
    * - clustermesh.apiserver.extraEnv
      - Additional clustermesh-apiserver environment variables.
      - list
@@ -377,10 +385,6 @@
      - Enables masquerading of IPv6 traffic leaving the node from endpoints.
      - bool
      - ``true``
-   * - enableIngressController
-     - Enable cilium ingress controller This will automatically set enable-envoy-config as well.
-     - bool
-     - ``false``
    * - enableK8sEventHandover
      - Configures the use of the KVStore to optimize Kubernetes event handling by mirroring it into the KVstore for reduced overhead in large clusters.
      - bool
@@ -475,6 +479,10 @@
      - ``{}``
    * - eni.iamRole
      - If using IAM role for Service Accounts will not try to inject identity values from cilium-aws kubernetes secret. Adds annotation to service account if managed by Helm. See https://github.com/aws/amazon-eks-pod-identity-webhook
+     - string
+     - ``""``
+   * - eni.instanceTagsFilter
+     - Filter via AWS EC2 Instance tags (k=v) which will dictate which AWS EC2 Instances are going to be used to create new ENIs
      - string
      - ``""``
    * - eni.subnetIDsFilter
@@ -920,7 +928,7 @@
    * - hubble.ui.proxy.image
      - Hubble-ui ingress proxy image.
      - object
-     - ``{"override":null,"pullPolicy":"Always","repository":"docker.io/envoyproxy/envoy","tag":"v1.18.4@sha256:e5c2bb2870d0e59ce917a5100311813b4ede96ce4eb0c6bfa879e3fbe3e83935"}``
+     - ``{"override":null,"pullPolicy":"Always","repository":"docker.io/envoyproxy/envoy","tag":"v1.20.2@sha256:eb7d88d5186648049f0a80062120bd45e7557bdff3f6a30e1fc92cbb50916868"}``
    * - hubble.ui.proxy.resources
      - Resource requests and limits for the 'proxy' container of the 'hubble-ui' deployment.
      - object
@@ -969,6 +977,14 @@
      - Configure image pull secrets for pulling container images
      - string
      - ``nil``
+   * - ingressController.enabled
+     - Enable cilium ingress controller This will automatically set enable-envoy-config as well.
+     - bool
+     - ``false``
+   * - ingressController.enforceHttps
+     - Enforce https for host having matching TLS host in Ingress. Incoming traffic to http listener will return 308 http error code with respective location in header.
+     - bool
+     - ``true``
    * - installIptablesRules
      - Configure whether to install iptables rules to allow for TPROXY (L7 proxy injection), iptables-based masquerading and compatibility with kube-proxy.
      - bool
@@ -1037,14 +1053,14 @@
      - healthz server bind address for the kube-proxy replacement. To enable set the value to '0.0.0.0:10256' for all ipv4 addresses and this '[::]:10256' for all ipv6 addresses. By default it is disabled.
      - string
      - ``""``
-   * - l2NeighDiscovery.arping-refresh-period
-     - Override the agent's default neighbor resolution refresh period.
-     - string
-     - ``"30s"``
    * - l2NeighDiscovery.enabled
      - Enable L2 neighbor discovery in the agent
      - bool
      - ``true``
+   * - l2NeighDiscovery.refreshPeriod
+     - Override the agent's default neighbor resolution refresh period.
+     - string
+     - ``"30s"``
    * - l7Proxy
      - Enable Layer 7 network policy.
      - bool
@@ -1507,6 +1523,10 @@
      - ``""``
    * - vtep.mac
      - A space separated list of VTEP device MAC addresses (VTEP MAC), for example "x:x:x:x:x:x  y:y:y:y:y:y:y"
+     - string
+     - ``""``
+   * - vtep.mask
+     - VTEP CIDRs Mask that applies to all VTEP CIDRs, for example "255.255.255.0"
      - string
      - ``""``
    * - wellKnownIdentities.enabled

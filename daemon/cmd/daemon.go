@@ -23,6 +23,8 @@ import (
 	health "github.com/cilium/cilium/cilium-health/launch"
 	"github.com/cilium/cilium/pkg/bandwidth"
 	"github.com/cilium/cilium/pkg/bgp/speaker"
+	bgpv1 "github.com/cilium/cilium/pkg/bgpv1/agent"
+	"github.com/cilium/cilium/pkg/bpf"
 	"github.com/cilium/cilium/pkg/cidr"
 	"github.com/cilium/cilium/pkg/clustermesh"
 	"github.com/cilium/cilium/pkg/controller"
@@ -180,6 +182,12 @@ type Daemon struct {
 
 	// event queue for serializing configuration updates to the daemon.
 	configModifyQueue *eventqueue.EventQueue
+
+	// controller for Cilium's BGP control plane.
+	bgpControlPlaneController *bgpv1.Controller
+
+	// CIDRs for which identities were restored during bootstrap
+	restoredCIDRs []*net.IPNet
 }
 
 // GetPolicyRepository returns the policy repository of the daemon
@@ -388,13 +396,38 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 	ctmap.InitMapInfo(option.Config.CTMapEntriesGlobalTCP, option.Config.CTMapEntriesGlobalAny,
 		option.Config.EnableIPv4, option.Config.EnableIPv6, option.Config.EnableNodePort)
 	policymap.InitMapInfo(option.Config.PolicyMapEntries)
-	lbmap.Init(lbmap.InitParams{
+
+	lbmapInitParams := lbmap.InitParams{
 		IPv4: option.Config.EnableIPv4,
 		IPv6: option.Config.EnableIPv6,
 
-		MaxSockRevNatMapEntries: option.Config.SockRevNatEntries,
-		MaxEntries:              option.Config.LBMapEntries,
-	})
+		MaxSockRevNatMapEntries:  option.Config.SockRevNatEntries,
+		ServiceMapMaxEntries:     option.Config.LBMapEntries,
+		BackEndMapMaxEntries:     option.Config.LBMapEntries,
+		RevNatMapMaxEntries:      option.Config.LBMapEntries,
+		AffinityMapMaxEntries:    option.Config.LBMapEntries,
+		SourceRangeMapMaxEntries: option.Config.LBMapEntries,
+		MaglevMapMaxEntries:      option.Config.LBMapEntries,
+	}
+	if option.Config.LBServiceMapEntries > 0 {
+		lbmapInitParams.ServiceMapMaxEntries = option.Config.LBServiceMapEntries
+	}
+	if option.Config.LBBackendMapEntries > 0 {
+		lbmapInitParams.BackEndMapMaxEntries = option.Config.LBBackendMapEntries
+	}
+	if option.Config.LBRevNatEntries > 0 {
+		lbmapInitParams.RevNatMapMaxEntries = option.Config.LBRevNatEntries
+	}
+	if option.Config.LBAffinityMapEntries > 0 {
+		lbmapInitParams.AffinityMapMaxEntries = option.Config.LBAffinityMapEntries
+	}
+	if option.Config.LBSourceRangeMapEntries > 0 {
+		lbmapInitParams.SourceRangeMapMaxEntries = option.Config.LBSourceRangeMapEntries
+	}
+	if option.Config.LBMaglevMapEntries > 0 {
+		lbmapInitParams.MaglevMapMaxEntries = option.Config.LBMaglevMapEntries
+	}
+	lbmap.Init(lbmapInitParams)
 
 	if option.Config.DryMode == false {
 		if err := rlimit.RemoveMemlock(); err != nil {
@@ -465,6 +498,23 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 		return nil, nil, fmt.Errorf("error while initializing BPF pcap recorder: %w", err)
 	}
 
+	// Collect old CIDR identities
+	var oldNIDs []identity.NumericIdentity
+	if option.Config.RestoreState && !option.Config.DryMode && ipcachemap.SupportsDump() {
+		if err := ipcachemap.IPCache.DumpWithCallback(func(key bpf.MapKey, value bpf.MapValue) {
+			k := key.(*ipcachemap.Key)
+			v := value.(*ipcachemap.RemoteEndpointInfo)
+			nid := identity.NumericIdentity(v.SecurityIdentity)
+			if nid.HasLocalScope() {
+				d.restoredCIDRs = append(d.restoredCIDRs, k.IPNet())
+				oldNIDs = append(oldNIDs, nid)
+			}
+		}); err != nil && !os.IsNotExist(err) {
+			log.WithError(err).Warning("Error dumping ipcache")
+		}
+		ipcachemap.IPCache.Close()
+	}
+
 	// Propagate identity allocator down to packages which themselves do not
 	// have types to which we can add an allocator member.
 	//
@@ -524,7 +574,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 	}
 
 	if option.Config.EnableIPv4EgressGateway {
-		d.egressGatewayManager = egressgateway.NewEgressGatewayManager(&d)
+		d.egressGatewayManager = egressgateway.NewEgressGatewayManager(&d, d.identityAllocator)
 	}
 
 	d.k8sWatcher = watchers.NewK8sWatcher(
@@ -557,7 +607,7 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 		d.k8sWatcher.RegisterNodeSubscriber(&d.k8sWatcher.K8sSvcCache)
 	}
 
-	d.k8sWatcher.NodeChain.Register(watchers.NewCiliumNodeUpdater(d.k8sWatcher))
+	d.k8sWatcher.NodeChain.Register(watchers.NewCiliumNodeUpdater(d.k8sWatcher, d.nodeDiscovery))
 
 	d.redirectPolicyManager.RegisterSvcCache(&d.k8sWatcher.K8sSvcCache)
 	d.redirectPolicyManager.RegisterGetStores(d.k8sWatcher)
@@ -980,6 +1030,15 @@ func NewDaemon(ctx context.Context, cancel context.CancelFunc, epMgr *endpointma
 		// identity allocator to run asynchronously.
 		realIdentityAllocator := d.identityAllocator
 		realIdentityAllocator.InitIdentityAllocator(k8s.CiliumClient(), nil)
+
+		// Preallocate IDs for old CIDRs, must be called after InitIdentityAllocator
+		if len(d.restoredCIDRs) > 0 {
+			log.Infof("Restoring %d old CIDR identities", len(d.restoredCIDRs))
+			_, err = d.ipcache.AllocateCIDRs(d.restoredCIDRs, oldNIDs, nil)
+			if err != nil {
+				log.WithError(err).Error("Error allocating old CIDR identities")
+			}
+		}
 
 		d.bootstrapClusterMesh(nodeMngr)
 	}

@@ -189,9 +189,10 @@ data:
   skip-crd-creation: "true"
 {{- end }}
 
-{{- if .Values.enableIngressController }}
+{{- if .Values.ingressController.enabled }}
   enable-ingress-controller: "true"
   enable-envoy-config: "true"
+  enforce-ingress-https: {{ .Values.ingressController.enforceHttps | quote }}
 {{- end }}
 
   # Enable IPv4 addressing. If enabled, all endpoints are allocated an IPv4
@@ -388,6 +389,7 @@ data:
   eni-tags: {{ .Values.eni.eniTags | toRawJson | quote }}
   subnet-ids-filter: {{ .Values.eni.subnetIDsFilter | quote }}
   subnet-tags-filter: {{ .Values.eni.subnetTagsFilter | quote }}
+  instance-tags-filter: {{ .Values.eni.instanceTagsFilter | quote }}
 {{- end }}
 
 {{- if .Values.azure.enabled }}
@@ -774,6 +776,9 @@ data:
 {{- if hasKey .Values.vtep "cidr" }}
   vtep-cidr: {{ .Values.vtep.cidr | quote }}
 {{- end }}
+{{- if hasKey .Values.vtep "mask" }}
+  vtep-mask: {{ .Values.vtep.mask | quote }}
+{{- end }}
 {{- if hasKey .Values.vtep "mac" }}
   vtep-mac: {{ .Values.vtep.mac | quote }}
 {{- end }}
@@ -814,6 +819,12 @@ data:
 {{- if and .Values.bgp.enabled .Values.bgp.announce.podCIDR }}
   bgp-announce-pod-cidr: {{ .Values.bgp.announce.podCIDR | quote }}
 {{- end}}
+
+{{- if .Values.bgpControlPlane.enabled }}
+  enable-bgp-control-plane: "true"
+{{- else }}
+  enable-bgp-control-plane: "false"
+{{- end }}
 
 {{- if hasKey .Values.bpf "root" }}
   bpf-root: {{ .Values.bpf.root | quote }}

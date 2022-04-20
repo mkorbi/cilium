@@ -139,6 +139,10 @@ const (
 	// option.IdentityChangeGracePeriod
 	IdentityChangeGracePeriod = 5 * time.Second
 
+	// IdentityRestoreGracePeriod is the default value for
+	// option.IdentityRestoreGracePeriod
+	IdentityRestoreGracePeriod = 10 * time.Minute
+
 	// ExecTimeout is a timeout for executing commands.
 	ExecTimeout = 300 * time.Second
 
@@ -453,5 +457,9 @@ const (
 	ARPBaseReachableTime = 30 * time.Second
 
 	// EnableVTEP enables VXLAN Tunnel Endpoint (VTEP) Integration
-	EnableVTEP = false
+	EnableVTEP     = false
+	MaxVTEPDevices = 8
+
+	// Enable BGP control plane features.
+	EnableBGPControlPlane = false
 )

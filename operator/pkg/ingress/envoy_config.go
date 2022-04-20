@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	envoy_config_cluster_v3 "github.com/cilium/proxy/go/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/cilium/proxy/go/envoy/config/core/v3"
@@ -16,6 +17,7 @@ import (
 	envoy_extensions_filters_network_http_connection_manager_v3 "github.com/cilium/proxy/go/envoy/extensions/filters/network/http_connection_manager/v3"
 	envoy_extensions_transport_sockets_tls_v3 "github.com/cilium/proxy/go/envoy/extensions/transport_sockets/tls/v3"
 	envoy_config_upstream "github.com/cilium/proxy/go/envoy/extensions/upstreams/http/v3"
+	envoy_type_matcher_v3 "github.com/cilium/proxy/go/envoy/type/matcher/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -32,6 +34,11 @@ import (
 	"github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
 	"github.com/cilium/cilium/pkg/k8s/informer"
 	slim_networkingv1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/networking/v1"
+)
+
+const (
+	wildCard       = "*"
+	envoyAuthority = ":authority"
 )
 
 type envoyConfigManager struct {
@@ -138,9 +145,9 @@ func getTLS(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress) 
 	return tls, nil
 }
 
-func getEnvoyConfigForIngress(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress) (*v2alpha1.CiliumEnvoyConfig, error) {
+func getEnvoyConfigForIngress(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress, enforcedHTTPS bool) (*v2alpha1.CiliumEnvoyConfig, error) {
 	backendServices := getBackendServices(ingress)
-	resources, err := getResources(k8sClient, ingress, backendServices)
+	resources, err := getResources(k8sClient, ingress, backendServices, enforcedHTTPS)
 	if err != nil {
 		return nil, err
 	}
@@ -195,18 +202,28 @@ func getBackendServices(ingress *slim_networkingv1.Ingress) []*v2alpha1.Service 
 	return backendServices
 }
 
-func getResources(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress, backendServices []*v2alpha1.Service) ([]v2alpha1.XDSResource, error) {
+func getResources(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress, backendServices []*v2alpha1.Service, enforcedHTTPS bool) ([]v2alpha1.XDSResource, error) {
 	var resources []v2alpha1.XDSResource
-	listener, err := getListenerResource(k8sClient, ingress)
+	listener, err := getListenerResource(k8sClient, ingress, enforcedHTTPS)
 	if err != nil {
 		return nil, err
 	}
 	resources = append(resources, listener)
+
 	routeConfig, err := getRouteConfigurationResource(ingress)
 	if err != nil {
 		return nil, err
 	}
 	resources = append(resources, routeConfig)
+
+	if enforcedHTTPS && tlsEnabled(ingress) {
+		redirectRoute, err := getRedirectRouteConfigurationResource(ingress)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, redirectRoute)
+	}
+
 	clusters, err := getClusterResources(backendServices)
 	if err != nil {
 		return nil, err
@@ -215,57 +232,93 @@ func getResources(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ing
 	return resources, nil
 }
 
-func getListenerResource(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress) (v2alpha1.XDSResource, error) {
-	tls, err := getTLS(k8sClient, ingress)
+func getListenerResource(k8sClient kubernetes.Interface, ingress *slim_networkingv1.Ingress, enforcedHTTPS bool) (v2alpha1.XDSResource, error) {
+	cecName := getCECNameForIngress(ingress)
+	defaultHttpConnectionManager, err := getConnectionManager(cecName, fmt.Sprintf("%s_route", cecName))
 	if err != nil {
-		log.WithError(err).Warn("Failed to get secret for ingress")
+		return v2alpha1.XDSResource{}, nil
 	}
 
-	connectionManager := envoy_extensions_filters_network_http_connection_manager_v3.HttpConnectionManager{
-		StatPrefix: ingress.Name,
-		RouteSpecifier: &envoy_extensions_filters_network_http_connection_manager_v3.HttpConnectionManager_Rds{
-			Rds: &envoy_extensions_filters_network_http_connection_manager_v3.Rds{
-				ConfigSource:    nil,
-				RouteConfigName: getCECNameForIngress(ingress) + "_route",
-			},
-		},
-		HttpFilters: []*envoy_extensions_filters_network_http_connection_manager_v3.HttpFilter{
-			{Name: "envoy.filters.http.router"},
-		},
-	}
-	connectionManagerBytes, err := proto.Marshal(&connectionManager)
-	if err != nil {
-		return v2alpha1.XDSResource{}, err
-	}
-	listener := envoy_config_listener.Listener{
-		Name: getCECNameForIngress(ingress),
-		FilterChains: []*envoy_config_listener.FilterChain{
+	var filterChains []*envoy_config_listener.FilterChain
+	if !tlsEnabled(ingress) {
+		filterChains = []*envoy_config_listener.FilterChain{
 			{
+				FilterChainMatch: &envoy_config_listener.FilterChainMatch{
+					TransportProtocol: "raw_buffer",
+				},
 				Filters: []*envoy_config_listener.Filter{
 					{
 						Name: "envoy.filters.network.http_connection_manager",
 						ConfigType: &envoy_config_listener.Filter_TypedConfig{
-							TypedConfig: &anypb.Any{
-								TypeUrl: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-								Value:   connectionManagerBytes,
-							},
+							TypedConfig: defaultHttpConnectionManager.Any,
 						},
 					},
 				},
 			},
-		},
-	}
-	if len(ingress.Spec.TLS) > 0 {
-		// TODO(tam) extend to list of tls
-		// just take the first one for now
-		if len(ingress.Spec.TLS[0].Hosts) > 0 {
-			domain := ingress.Spec.TLS[0].Hosts[0]
-			tlsConf := tls[domain]
-			if tlsConf != nil {
-				listener.FilterChains[0].TransportSocket = tlsConf
+		}
+	} else {
+		insecureHttpConnectionManager := defaultHttpConnectionManager
+		if enforcedHTTPS {
+			insecureHttpConnectionManager, err = getConnectionManager(cecName, fmt.Sprintf("%s_redirect", cecName))
+			if err != nil {
+				return v2alpha1.XDSResource{}, nil
 			}
 		}
+
+		tls, err := getTLS(k8sClient, ingress)
+		if err != nil {
+			log.WithError(err).Warn("Failed to get secret for ingress")
+		}
+
+		// TODO(tam) extend to list of tls
+		// just take the first one for now
+		var tlsConf *envoy_config_core_v3.TransportSocket
+		if len(ingress.Spec.TLS[0].Hosts) > 0 {
+			domain := ingress.Spec.TLS[0].Hosts[0]
+			tlsConf = tls[domain]
+		}
+
+		filterChains = []*envoy_config_listener.FilterChain{
+			{
+				FilterChainMatch: &envoy_config_listener.FilterChainMatch{
+					TransportProtocol: "raw_buffer",
+				},
+				Filters: []*envoy_config_listener.Filter{
+					{
+						Name: "envoy.filters.network.http_connection_manager",
+						ConfigType: &envoy_config_listener.Filter_TypedConfig{
+							TypedConfig: insecureHttpConnectionManager.Any,
+						},
+					},
+				},
+			},
+			{
+				FilterChainMatch: &envoy_config_listener.FilterChainMatch{
+					TransportProtocol: "tls",
+				},
+				Filters: []*envoy_config_listener.Filter{
+					{
+						Name: "envoy.filters.network.http_connection_manager",
+						ConfigType: &envoy_config_listener.Filter_TypedConfig{
+							TypedConfig: defaultHttpConnectionManager.Any,
+						},
+					},
+				},
+				TransportSocket: tlsConf,
+			},
+		}
 	}
+
+	listener := envoy_config_listener.Listener{
+		Name:         getCECNameForIngress(ingress),
+		FilterChains: filterChains,
+		ListenerFilters: []*envoy_config_listener.ListenerFilter{
+			{
+				Name: "envoy.filters.listener.tls_inspector",
+			},
+		},
+	}
+
 	listenerBytes, err := proto.Marshal(&listener)
 	if err != nil {
 		return v2alpha1.XDSResource{}, err
@@ -274,6 +327,33 @@ func getListenerResource(k8sClient kubernetes.Interface, ingress *slim_networkin
 		Any: &anypb.Any{
 			TypeUrl: envoy.ListenerTypeURL,
 			Value:   listenerBytes,
+		},
+	}, nil
+}
+
+func getConnectionManager(name string, routeName string) (v2alpha1.XDSResource, error) {
+	var connectionManager envoy_extensions_filters_network_http_connection_manager_v3.HttpConnectionManager
+	connectionManager = envoy_extensions_filters_network_http_connection_manager_v3.HttpConnectionManager{
+		StatPrefix: name,
+		RouteSpecifier: &envoy_extensions_filters_network_http_connection_manager_v3.HttpConnectionManager_Rds{
+			Rds: &envoy_extensions_filters_network_http_connection_manager_v3.Rds{
+				RouteConfigName: routeName,
+			},
+		},
+		HttpFilters: []*envoy_extensions_filters_network_http_connection_manager_v3.HttpFilter{
+			{Name: "envoy.filters.http.router"},
+		},
+	}
+
+	connectionManagerBytes, err := proto.Marshal(&connectionManager)
+	if err != nil {
+		return v2alpha1.XDSResource{}, err
+	}
+
+	return v2alpha1.XDSResource{
+		Any: &anypb.Any{
+			TypeUrl: envoy.HttpConnectionManagerTypeURL,
+			Value:   connectionManagerBytes,
 		},
 	}, nil
 }
@@ -327,13 +407,18 @@ func toAny(message proto.Message) *anypb.Any {
 	return a
 }
 
-func getRouteMatch(ingressPath slim_networkingv1.HTTPIngressPath) *envoy_config_route_v3.RouteMatch {
+func getRouteMatch(host string, ingressPath slim_networkingv1.HTTPIngressPath) *envoy_config_route_v3.RouteMatch {
+	headerMatchers := getHeaderMatchers(host)
 	if ingressPath.PathType == nil || *ingressPath.PathType == slim_networkingv1.PathTypeImplementationSpecific ||
 		*ingressPath.PathType == slim_networkingv1.PathTypePrefix {
 		return &envoy_config_route_v3.RouteMatch{
-			PathSpecifier: &envoy_config_route_v3.RouteMatch_Prefix{
-				Prefix: ingressPath.Path,
+			PathSpecifier: &envoy_config_route_v3.RouteMatch_SafeRegex{
+				SafeRegex: &envoy_type_matcher_v3.RegexMatcher{
+					EngineType: &envoy_type_matcher_v3.RegexMatcher_GoogleRe2{},
+					Regex:      getMatchingPrefixRegex(ingressPath.Path),
+				},
 			},
+			Headers: headerMatchers,
 		}
 	}
 	if *ingressPath.PathType == slim_networkingv1.PathTypeExact {
@@ -341,16 +426,40 @@ func getRouteMatch(ingressPath slim_networkingv1.HTTPIngressPath) *envoy_config_
 			PathSpecifier: &envoy_config_route_v3.RouteMatch_Path{
 				Path: ingressPath.Path,
 			},
+			Headers: headerMatchers,
 		}
 	}
 	return nil
 }
 
+func getHeaderMatchers(host string) []*envoy_config_route_v3.HeaderMatcher {
+	if len(host) == 0 || host == wildCard || !strings.Contains(host, wildCard) {
+		return nil
+	}
+	// Make sure that wildcard character only match one single dns domain.
+	// For example, if host is *.foo.com, baz.bar.foo.com should not match
+	return []*envoy_config_route_v3.HeaderMatcher{
+		{
+			Name: envoyAuthority,
+			HeaderMatchSpecifier: &envoy_config_route_v3.HeaderMatcher_StringMatch{
+				StringMatch: &envoy_type_matcher_v3.StringMatcher{
+					MatchPattern: &envoy_type_matcher_v3.StringMatcher_SafeRegex{
+						SafeRegex: &envoy_type_matcher_v3.RegexMatcher{
+							EngineType: &envoy_type_matcher_v3.RegexMatcher_GoogleRe2{},
+							Regex:      getMatchingHeaderRegex(host),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func getVirtualHost(ingress *slim_networkingv1.Ingress, rule slim_networkingv1.IngressRule) *envoy_config_route_v3.VirtualHost {
-	var routes []*envoy_config_route_v3.Route
+	routes := make(SortableRoute, 0, len(rule.HTTP.Paths))
 	for _, path := range rule.HTTP.Paths {
 		route := envoy_config_route_v3.Route{
-			Match: getRouteMatch(path),
+			Match: getRouteMatch(rule.Host, path),
 			Action: &envoy_config_route_v3.Route_Route{
 				Route: &envoy_config_route_v3.RouteAction{
 					ClusterSpecifier: &envoy_config_route_v3.RouteAction_Cluster{
@@ -359,15 +468,21 @@ func getVirtualHost(ingress *slim_networkingv1.Ingress, rule slim_networkingv1.I
 				},
 			},
 		}
+
 		routes = append(routes, &route)
 	}
 
-	domains := []string{"*"}
+	// This is to make sure that the Exact match is always having higher priority.
+	// Each route entry in the virtual host is checked, in order. If there is a match, the route is used and no further route checks are made.
+	// Related docs https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/route_matching
+	sort.Sort(routes)
+
+	domains := []string{wildCard}
 	if rule.Host != "" {
 		domains = []string{
 			rule.Host,
 			// match authority header with port (e.g. "example.com:80")
-			net.JoinHostPort(rule.Host, "*"),
+			net.JoinHostPort(rule.Host, wildCard),
 		}
 	}
 	return &envoy_config_route_v3.VirtualHost{
@@ -401,7 +516,7 @@ func getRouteConfigurationResource(ingress *slim_networkingv1.Ingress) (v2alpha1
 		}
 		virtualhosts = append(virtualhosts, &envoy_config_route_v3.VirtualHost{
 			Name:    "default-backend",
-			Domains: []string{"*"},
+			Domains: []string{wildCard},
 			Routes:  []*envoy_config_route_v3.Route{route},
 		})
 	}
@@ -420,4 +535,49 @@ func getRouteConfigurationResource(ingress *slim_networkingv1.Ingress) (v2alpha1
 			Value:   routeBytes,
 		},
 	}, nil
+}
+
+func getRedirectRouteConfigurationResource(ingress *slim_networkingv1.Ingress) (v2alpha1.XDSResource, error) {
+	route := &envoy_config_route_v3.Route{
+		Match: &envoy_config_route_v3.RouteMatch{
+			PathSpecifier: &envoy_config_route_v3.RouteMatch_Prefix{
+				Prefix: "/",
+			},
+		},
+		Action: &envoy_config_route_v3.Route_Redirect{
+			Redirect: &envoy_config_route_v3.RedirectAction{
+				SchemeRewriteSpecifier: &envoy_config_route_v3.RedirectAction_HttpsRedirect{
+					HttpsRedirect: true,
+				},
+				ResponseCode: envoy_config_route_v3.RedirectAction_PERMANENT_REDIRECT,
+			},
+		},
+	}
+
+	virtualHost := &envoy_config_route_v3.VirtualHost{
+		Name:    "default-redirect",
+		Domains: []string{wildCard},
+		Routes:  []*envoy_config_route_v3.Route{route},
+	}
+
+	routeConfig := envoy_config_route_v3.RouteConfiguration{
+		Name:         getCECNameForIngress(ingress) + "_redirect",
+		VirtualHosts: []*envoy_config_route_v3.VirtualHost{virtualHost},
+	}
+
+	routeBytes, err := proto.Marshal(&routeConfig)
+	if err != nil {
+		return v2alpha1.XDSResource{}, err
+	}
+
+	return v2alpha1.XDSResource{
+		Any: &anypb.Any{
+			TypeUrl: envoy.RouteTypeURL,
+			Value:   routeBytes,
+		},
+	}, nil
+}
+
+func tlsEnabled(ingress *slim_networkingv1.Ingress) bool {
+	return len(ingress.Spec.TLS) > 0
 }

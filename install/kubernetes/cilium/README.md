@@ -65,6 +65,8 @@ contributors across the globe, there is almost always someone available to help.
 | bgp.announce.loadbalancerIP | bool | `false` | Enable allocation and announcement of service LoadBalancer IPs |
 | bgp.announce.podCIDR | bool | `false` | Enable announcement of node pod CIDR |
 | bgp.enabled | bool | `false` | Enable BGP support inside Cilium; embeds a new ConfigMap for BGP inside cilium-agent and cilium-operator |
+| bgpControlPlane | object | `{"enabled":false}` | This feature set enables virtual BGP routers to be created via  CiliumBGPPeeringPolicy CRDs. |
+| bgpControlPlane.enabled | bool | `false` | Enables the BGP control plane.  |
 | bpf.clockProbe | bool | `false` | Enable BPF clock source probing for more efficient tick retrieval. |
 | bpf.lbExternalClusterIP | bool | `false` | Allow cluster external access to ClusterIP services. |
 | bpf.lbMapMax | int | `65536` | Configure the maximum number of service entries in the load balancer maps. |
@@ -86,7 +88,7 @@ contributors across the globe, there is almost always someone available to help.
 | cluster.id | int | `nil` | Unique ID of the cluster. Must be unique across all connected clusters and in the range of 1 to 255. Only required for Cluster Mesh. |
 | cluster.name | string | `"default"` | Name of the cluster. Only required for Cluster Mesh. |
 | clustermesh.apiserver.affinity | object | `{"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{"matchLabels":{"k8s-app":"clustermesh-apiserver"}},"topologyKey":"kubernetes.io/hostname"}]}}` | Affinity for clustermesh.apiserver |
-| clustermesh.apiserver.etcd.image | object | `{"override":null,"pullPolicy":"Always","repository":"quay.io/coreos/etcd","tag":"v3.4.13"}` | Clustermesh API server etcd image. |
+| clustermesh.apiserver.etcd.image | object | `{"override":null,"pullPolicy":"Always","repository":"quay.io/coreos/etcd","tag":"v3.5.2@sha256:70fe70b6cdaea99fa9e99d3a16483954eb084c3b32a2475abea4e709a793636c"}` | Clustermesh API server etcd image. |
 | clustermesh.apiserver.extraEnv | list | `[]` | Additional clustermesh-apiserver environment variables. |
 | clustermesh.apiserver.image | object | `{"digest":"","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/clustermesh-apiserver","tag":"latest","useDigest":false}` | Clustermesh API server image. |
 | clustermesh.apiserver.nodeSelector | object | `{}` | Node labels for pod assignment ref: https://kubernetes.io/docs/user-guide/node-selection/ |
@@ -145,7 +147,6 @@ contributors across the globe, there is almost always someone available to help.
 | enableCriticalPriorityClass | bool | `true` | Explicitly enable or disable priority class. .Capabilities.KubeVersion is unsettable in `helm template` calls, it depends on k8s libraries version that Helm was compiled against. This option allows to explicitly disable setting the priority class, which is useful for rendering charts for gke clusters in advance. |
 | enableIPv4Masquerade | bool | `true` | Enables masquerading of IPv4 traffic leaving the node from endpoints. |
 | enableIPv6Masquerade | bool | `true` | Enables masquerading of IPv6 traffic leaving the node from endpoints. |
-| enableIngressController | bool | `false` | Enable cilium ingress controller This will automatically set enable-envoy-config as well. |
 | enableK8sEventHandover | bool | `false` | Configures the use of the KVStore to optimize Kubernetes event handling by mirroring it into the KVstore for reduced overhead in large clusters. |
 | enableK8sTerminatingEndpoint | bool | `true` | Configure whether to enable auto detect of terminating state for endpoints in order to support graceful termination. |
 | enableXTSocketFallback | bool | `true` | Enables the fallback compatibility solution for when the xt_socket kernel module is missing and it is needed for the datapath L7 redirection to work properly. See documentation for details on when this can be disabled: https://docs.cilium.io/en/stable/operations/system_requirements/#linux-kernel. |
@@ -170,6 +171,7 @@ contributors across the globe, there is almost always someone available to help.
 | eni.enabled | bool | `false` | Enable Elastic Network Interface (ENI) integration. |
 | eni.eniTags | object | `{}` | Tags to apply to the newly created ENIs |
 | eni.iamRole | string | `""` | If using IAM role for Service Accounts will not try to inject identity values from cilium-aws kubernetes secret. Adds annotation to service account if managed by Helm. See https://github.com/aws/amazon-eks-pod-identity-webhook |
+| eni.instanceTagsFilter | string | `""` | Filter via AWS EC2 Instance tags (k=v) which will dictate which AWS EC2 Instances are going to be used to create new ENIs |
 | eni.subnetIDsFilter | string | `""` | Filter via subnet IDs which will dictate which subnets are going to be used to create new ENIs Important note: This requires that each instance has an ENI with a matching subnet attached when Cilium is deployed. If you only want to control subnets for ENIs attached by Cilium, use the CNI configuration file settings (cni.customConf) instead. |
 | eni.subnetTagsFilter | string | `""` | Filter via tags (k=v) which will dictate which subnets are going to be used to create new ENIs Important note: This requires that each instance has an ENI with a matching subnet attached when Cilium is deployed. If you only want to control subnets for ENIs attached by Cilium, use the CNI configuration file settings (cni.customConf) instead. |
 | eni.updateEC2AdapterLimitViaAPI | bool | `false` | Update ENI Adapter limits from the EC2 API |
@@ -280,7 +282,7 @@ contributors across the globe, there is almost always someone available to help.
 | hubble.ui.podLabels | object | `{}` | Labels to be added to hubble-ui pods |
 | hubble.ui.priorityClassName | string | `""` | The priority class to use for hubble-ui |
 | hubble.ui.proxy.extraEnv | list | `[]` | Additional hubble-ui proxy environment variables. |
-| hubble.ui.proxy.image | object | `{"override":null,"pullPolicy":"Always","repository":"docker.io/envoyproxy/envoy","tag":"v1.18.4@sha256:e5c2bb2870d0e59ce917a5100311813b4ede96ce4eb0c6bfa879e3fbe3e83935"}` | Hubble-ui ingress proxy image. |
+| hubble.ui.proxy.image | object | `{"override":null,"pullPolicy":"Always","repository":"docker.io/envoyproxy/envoy","tag":"v1.20.2@sha256:eb7d88d5186648049f0a80062120bd45e7557bdff3f6a30e1fc92cbb50916868"}` | Hubble-ui ingress proxy image. |
 | hubble.ui.proxy.resources | object | `{}` | Resource requests and limits for the 'proxy' container of the 'hubble-ui' deployment. |
 | hubble.ui.replicas | int | `1` | The number of replicas of Hubble UI to deploy. |
 | hubble.ui.rollOutPods | bool | `false` | Roll out Hubble-ui pods automatically when configmap is updated. |
@@ -293,6 +295,8 @@ contributors across the globe, there is almost always someone available to help.
 | identityAllocationMode | string | `"crd"` | Method to use for identity allocation (`crd` or `kvstore`). |
 | image | object | `{"digest":"","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/cilium","tag":"latest","useDigest":false}` | Agent container image. |
 | imagePullSecrets | string | `nil` | Configure image pull secrets for pulling container images |
+| ingressController.enabled | bool | `false` | Enable cilium ingress controller This will automatically set enable-envoy-config as well. |
+| ingressController.enforceHttps | bool | `true` | Enforce https for host having matching TLS host in Ingress. Incoming traffic to http listener will return 308 http error code with respective location in header. |
 | installIptablesRules | bool | `true` | Configure whether to install iptables rules to allow for TPROXY (L7 proxy injection), iptables-based masquerading and compatibility with kube-proxy. |
 | installNoConntrackIptablesRules | bool | `false` | Install Iptables rules to skip netfilter connection tracking on all pod traffic. This option is only effective when Cilium is running in direct routing and full KPR mode. Moreover, this option cannot be enabled when Cilium is running in a managed Kubernetes environment or in a chained CNI setup. |
 | ipMasqAgent | object | `{"enabled":false}` | Configure the eBPF-based ip-masq-agent |
@@ -310,8 +314,8 @@ contributors across the globe, there is almost always someone available to help.
 | keepDeprecatedLabels | bool | `false` | Keep the deprecated selector labels when deploying Cilium DaemonSet. |
 | keepDeprecatedProbes | bool | `false` | Keep the deprecated probes when deploying Cilium DaemonSet |
 | kubeProxyReplacementHealthzBindAddr | string | `""` | healthz server bind address for the kube-proxy replacement. To enable set the value to '0.0.0.0:10256' for all ipv4 addresses and this '[::]:10256' for all ipv6 addresses. By default it is disabled. |
-| l2NeighDiscovery.arping-refresh-period | string | `"30s"` | Override the agent's default neighbor resolution refresh period. |
 | l2NeighDiscovery.enabled | bool | `true` | Enable L2 neighbor discovery in the agent |
+| l2NeighDiscovery.refreshPeriod | string | `"30s"` | Override the agent's default neighbor resolution refresh period. |
 | l7Proxy | bool | `true` | Enable Layer 7 network policy. |
 | livenessProbe.failureThreshold | int | `10` | failure threshold of liveness probe |
 | livenessProbe.periodSeconds | int | `30` | interval between checks of the liveness probe |
@@ -428,4 +432,5 @@ contributors across the globe, there is almost always someone available to help.
 | vtep.enabled | bool | `false` | Enables VXLAN Tunnel Endpoint (VTEP) Integration (beta) to allow Cilium-managed pods to talk to third party VTEP devices over Cilium tunnel. |
 | vtep.endpoint | string | `""` | A space separated list of VTEP device endpoint IPs, for example "1.1.1.1  1.1.2.1" |
 | vtep.mac | string | `""` | A space separated list of VTEP device MAC addresses (VTEP MAC), for example "x:x:x:x:x:x  y:y:y:y:y:y:y" |
+| vtep.mask | string | `""` | VTEP CIDRs Mask that applies to all VTEP CIDRs, for example "255.255.255.0" |
 | wellKnownIdentities.enabled | bool | `false` | Enable the use of well-known identities. |
